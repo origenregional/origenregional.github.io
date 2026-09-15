@@ -1018,7 +1018,7 @@ async function init() {
             skuRaw = c[0]; nombreRaw = c[1]; marcaRaw = c[2]; catRaw = c[3]; pesoRaw = c[4]; precioRaw = c[5]; imagenRaw = '';
           } else {
             // FORMATO PERFECTO: 7 columnas o más (SKU, Nombre, Marca, Categoría, Peso, Imagen, Precio)
-            skuRaw = c[0]; nombreRaw = c[1]; marcaRaw = c[2]; catRaw = c[3]; pesoRaw = c[4]; imagenRaw = c[5]; precioRaw = c[6];
+            skuRaw = c[0]; nombreRaw = c[1]; marcaRaw = c[2]; catRaw = c[3]; pesoRaw = c[4]; precioRaw = c[5]; imagenRaw = c[6];
           }
           
           const skuFinal = skuRaw ? skuRaw.trim() : '';
@@ -1031,8 +1031,9 @@ async function init() {
               marca:  marcaRaw ? marcaRaw.trim() : '',
               cat:    catRaw ? catRaw.trim() : '',
               peso:   pesoRaw ? pesoRaw.trim() : '',
-              imagen: imagenRaw ? imagenRaw.trim() : '', // ← ¡Aquí se guarda la foto!
               precio: precioFinal || 0,
+              imagen: imagenRaw ? imagenRaw.trim() : '', // ← ¡Aquí se guarda la foto!
+              
               e:      emoji(catRaw || '')
             });
           }
