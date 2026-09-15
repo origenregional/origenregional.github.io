@@ -974,7 +974,7 @@ let all = [...PRODUCTS];
 let cart = [];
 
 // ============================================================================
-// ── SISTEMA INTEGRADO DE PRODUCTOS Y CARRITO (CONSOLIDADO POR SKU) ──
+// ── SISTEMA INTEGRADO DE PRODUCTOS Y CARRITO (LECTOR INTELIGENTE AUTOMÁTICO) ──
 // ============================================================================
 
 // ── Google Sheets CSV ────────────────────────────────────────
@@ -989,26 +989,48 @@ async function init() {
       const filas = t.split(/\r?\n/);
       const productosCargados = [];
       
-      // Empezamos en i = 1 para saltarnos la fila de títulos (SKU;Nombre;etc)
+      // TRUCO CLAVE: Leemos la primera fila con datos para adivinar el separador
+      let separador = ';';
+      if (filas.length > 0) {
+        const primeraFila = filas[0];
+        // Si hay comas y no hay puntos y comas, asumimos que usa comas
+        if (primeraFila.includes(',') && !primeraFila.includes(';')) {
+          separador = ',';
+        }
+      }
+      
+      // Empezamos en i = 1 para saltarnos la fila de títulos
       for (let i = 1; i < filas.length; i++) {
         if (!filas[i].trim()) continue;
         
-        // Separamos por punto y coma (;)
-        const c = filas[i].split(';');
+        // Separamos dinámicamente según el formato de tu Google Sheets
+        const c = filas[i].split(separador);
         
-        if (c.length >= 6) {
-          const skuLimpio = c[0] ? c[0].trim() : '';
-          const precioLimpio = c[5] ? parseInt(c[5].replace(/[^0-9]/g, '')) : 0;
+        if (c.length >= 5) {
+          // Si el CSV tiene solo 5 columnas es porque no leyó el SKU, si tiene 6 o más tiene SKU
+          let skuRaw, nombreRaw, marcaRaw, catRaw, pesoRaw, precioRaw;
           
-          if (skuLimpio) {
+          if (c.length === 5) {
+            // Plan de respaldo por si el SKU no se guardó en la primera columna
+            nombreRaw = c[0]; marcaRaw = c[1]; catRaw = c[2]; pesoRaw = c[3]; precioRaw = c[4];
+            skuRaw = (marcaRaw + "-" + nombreRaw).toUpperCase().replace(/\s+/g, '');
+          } else {
+            // Formato correcto de 6 columnas
+            skuRaw = c[0]; nombreRaw = c[1]; marcaRaw = c[2]; catRaw = c[3]; pesoRaw = c[4]; precioRaw = c[5];
+          }
+          
+          const skuFinal = skuRaw ? skuRaw.trim() : '';
+          const precioFinal = precioRaw ? parseInt(precioRaw.replace(/[^0-9]/g, '')) : 0;
+          
+          if (skuFinal && nombreRaw) {
             productosCargados.push({
-              sku:    skuLimpio,
-              nombre: c[1] ? c[1].trim() : 'Producto sin nombre',
-              marca:  c[2] ? c[2].trim() : '',
-              cat:    c[3] ? c[3].trim() : '',
-              peso:   c[4] ? c[4].trim() : '',
-              precio: precioLimpio || 0,
-              e:      emoji(c[3] || '')
+              sku:    skuFinal,
+              nombre: nombreRaw.trim(),
+              marca:  marcaRaw ? marcaRaw.trim() : '',
+              cat:    catRaw ? catRaw.trim() : '',
+              peso:   pesoRaw ? pesoRaw.trim() : '',
+              precio: precioFinal || 0,
+              e:      emoji(catRaw || '')
             });
           }
         }
@@ -1056,23 +1078,19 @@ function render(list) {
 
 // ── Lógica del Carrito ───────────────────────────────────────────
 function addPorSku(skuProducto) {
-  // Buscamos el producto en la lista general usando el SKU
   const p = all.find(x => x.sku === skuProducto);
   if (!p) {
     console.log("No se encontró el producto con el SKU:", skuProducto);
     return;
   }
 
-  // Buscamos si ya existe en el carrito
   const ex = cart.find(x => x.sku === skuProducto);
-  
   if (ex) {
     ex.qty++;
   } else {
     cart.push({ ...p, qty: 1 });
   }
 
-  // Animación del botón original de Claude
   const btn = document.querySelector(`button[onclick="addPorSku('${skuProducto}')"]`);
   if (btn) {
     btn.textContent = '✓';
@@ -1089,16 +1107,14 @@ function addPorSku(skuProducto) {
 function chg(skuProducto, d) {
   const ex = cart.find(x => x.sku === skuProducto);
   if (!ex) return;
-  
   ex.qty += d;
-  
   if (ex.qty <= 0) {
     cart = cart.filter(x => x.sku !== skuProducto);
   }
-  
   updateCart();
 }
 
+// Dibujo interno del carrito mapeado por SKU
 function updateCart() {
   const n = cart.reduce((s, x) => s + x.qty, 0);
   document.getElementById('count').textContent = n;
