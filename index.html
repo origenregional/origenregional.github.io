@@ -977,6 +977,24 @@ const PRODUCTS = [
 let all = [...PRODUCTS];
 let cart = [];
 
+// ── Parser CSV robusto (maneja comas dentro de celdas) ───────
+function parseCSV(text) {
+  const rows = [];
+  const lines = text.trim().split('\n');
+  for (let i = 1; i < lines.length; i++) {
+    const cols = [];
+    let cur = '', inQ = false;
+    for (const ch of lines[i]) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cols.push(cur.trim());
+    if (cols.length >= 5) rows.push(cols);
+  }
+  return rows;
+}
+ 
 // ── Google Sheets CSV ────────────────────────────────────────
 async function init() {
   const csv = getComputedStyle(document.documentElement)
@@ -985,12 +1003,10 @@ async function init() {
     try {
       const r = await fetch(csv);
       const t = await r.text();
-      const rows = t.trim().split('\n').slice(1);
-      all = rows.map(row => {
-        const c = row.split(',').map(x => x.trim().replace(/^"|"$/g,''));
-        return { nombre:c[0], marca:c[1], cat:c[2], peso:c[3],
-                 precio:parseInt(c[4])||0, e: emoji(c[2]) };
-      }).filter(p => p.nombre && p.precio > 0);
+      all = parseCSV(t).map(c => ({
+        nombre: c[0], marca: c[1], cat: c[2], peso: c[3],
+        precio: parseInt(c[4]) || 0, e: emoji(c[2])
+      })).filter(p => p.nombre && p.precio > 0);
     } catch(e) {
       document.getElementById('notice').style.display='block';
     }
@@ -999,11 +1015,10 @@ async function init() {
   }
   render(all);
 }
-
+ 
 function emoji(cat) {
   return {'Miel':'🍯','Caramelos':'🍬','Licor':'🍶','Aceite':'🫒','Dulce':'🥛'}[cat]||'🛍️';
 }
-
 // ── Render ───────────────────────────────────────────────────
 function render(list) {
   const g = document.getElementById('grid');
