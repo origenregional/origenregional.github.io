@@ -1007,16 +1007,18 @@ async function init() {
         const c = filas[i].split(separador);
         
         if (c.length >= 5) {
-          // Si el CSV tiene solo 5 columnas es porque no leyó el SKU, si tiene 6 o más tiene SKU
-          let skuRaw, nombreRaw, marcaRaw, catRaw, pesoRaw, precioRaw;
+          let skuRaw, nombreRaw, marcaRaw, catRaw, pesoRaw, imagenRaw, precioRaw;
           
           if (c.length === 5) {
-            // Plan de respaldo por si el SKU no se guardó en la primera columna
-            nombreRaw = c[0]; marcaRaw = c[1]; catRaw = c[2]; pesoRaw = c[3]; precioRaw = c[4];
+            // Plan de respaldo por si es la tabla súper vieja (sin SKU ni Imagen)
+            nombreRaw = c[0]; marcaRaw = c[1]; catRaw = c[2]; pesoRaw = c[3]; precioRaw = c[4]; imagenRaw = '';
             skuRaw = (marcaRaw + "-" + nombreRaw).toUpperCase().replace(/\s+/g, '');
+          } else if (c.length === 6) {
+            // Plan de respaldo por si tiene SKU pero todavía no agregaron la columna de Imagen
+            skuRaw = c[0]; nombreRaw = c[1]; marcaRaw = c[2]; catRaw = c[3]; pesoRaw = c[4]; precioRaw = c[5]; imagenRaw = '';
           } else {
-            // Formato correcto de 6 columnas
-            skuRaw = c[0]; nombreRaw = c[1]; marcaRaw = c[2]; catRaw = c[3]; pesoRaw = c[4]; precioRaw = c[5];
+            // FORMATO PERFECTO: 7 columnas o más (SKU, Nombre, Marca, Categoría, Peso, Imagen, Precio)
+            skuRaw = c[0]; nombreRaw = c[1]; marcaRaw = c[2]; catRaw = c[3]; pesoRaw = c[4]; imagenRaw = c[5]; precioRaw = c[6];
           }
           
           const skuFinal = skuRaw ? skuRaw.trim() : '';
@@ -1029,6 +1031,7 @@ async function init() {
               marca:  marcaRaw ? marcaRaw.trim() : '',
               cat:    catRaw ? catRaw.trim() : '',
               peso:   pesoRaw ? pesoRaw.trim() : '',
+              imagen: imagenRaw ? imagenRaw.trim() : '', // ← ¡Aquí se guarda la foto!
               precio: precioFinal || 0,
               e:      emoji(catRaw || '')
             });
@@ -1052,6 +1055,7 @@ function emoji(cat) {
   return {'miel':'🍯','caramelo':'🍬','licor':'🍶','aceite':'🫒','dulce':'🥛'}[limpia] || '🛍️';
 }
 
+
 // ── Render de Productos ───────────────────────────────────────────
 function render(list) {
   const g = document.getElementById('grid');
@@ -1062,7 +1066,13 @@ function render(list) {
   
   g.innerHTML = list.map((p) => `
     <div class="p-card" style="display: flex !important; visibility: visible !important;">
-      <div class="p-img"><span>${p.e}</span></div>
+      <      // Si el Excel tiene un enlace de imagen válido, muestra la foto. Si está vacío, usa el emoji de respaldo.
+      <div class="p-img">
+        ${p.imagen && p.imagen.startsWith('http') 
+          ? `<img src="${p.imagen}" alt="${p.nombre}" style="width:100%; height:100%; object-fit:cover;">` 
+          : `<span>${p.e}</span>`
+        }
+      </div>
       <div class="p-body">
         <p class="p-brand">${p.marca}</p>
         <p class="p-name">${p.nombre}</p>
