@@ -977,24 +977,6 @@ const PRODUCTS = [
 let all = [...PRODUCTS];
 let cart = [];
 
-// ── Parser CSV robusto (maneja comas dentro de celdas) ───────
-function parseCSV(text) {
-  const rows = [];
-  const lines = text.trim().split('\n');
-  for (let i = 1; i < lines.length; i++) {
-    const cols = [];
-    let cur = '', inQ = false;
-    for (const ch of lines[i]) {
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
-      else { cur += ch; }
-    }
-    cols.push(cur.trim());
-    if (cols.length >= 5) rows.push(cols);
-  }
-  return rows;
-}
-
 // ── Google Sheets CSV ────────────────────────────────────────
 async function init() {
   const csv = getComputedStyle(document.documentElement)
