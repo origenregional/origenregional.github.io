@@ -974,10 +974,10 @@ let all = [...PRODUCTS];
 let cart = [];
 
 // ============================================================================
-// ── SISTEMA INTEGRADO DE PRODUCTOS Y CARRITO (OPTIMIZADO POR SKU) ──
+// ── SISTEMA INTEGRADO DE PRODUCTOS Y CARRITO (CONSOLIDADO POR SKU) ──
 // ============================================================================
 
-// ── Google Sheets CSV con Soporte SKU ────────────────────────
+// ── Google Sheets CSV ────────────────────────────────────────
 async function init() {
   const csv = getComputedStyle(document.documentElement)
     .getPropertyValue('--sheet-csv').trim().replace(/['"]/g,'');
@@ -986,33 +986,36 @@ async function init() {
       const r = await fetch(csv);
       const t = await r.text();
       
-      // Separamos por líneas
       const filas = t.split(/\r?\n/);
       const productosCargados = [];
       
-      // Empezamos en i = 1 para saltarnos la fila de títulos
+      // Empezamos en i = 1 para saltarnos la fila de títulos (SKU;Nombre;etc)
       for (let i = 1; i < filas.length; i++) {
         if (!filas[i].trim()) continue;
         
-        // Dividimos por punto y coma (;) tradicional de Google Sheets en español
+        // Separamos por punto y coma (;)
         const c = filas[i].split(';');
         
-        // Verificamos que tenga al menos las 6 columnas (SKU, Nombre, Marca, Categoría, Peso, Precio)
         if (c.length >= 6) {
-          productosCargados.push({
-            sku:    c[0].trim(),
-            nombre: c[1].trim(),
-            marca:  c[2].trim(),
-            cat:    c[3].trim(),
-            peso:   c[4].trim(),
-            precio: parseInt(c[5].replace(/[^0-9]/g, '')) || 0,
-            e:      emoji(c[3].trim())
-          });
+          const skuLimpio = c[0] ? c[0].trim() : '';
+          const precioLimpio = c[5] ? parseInt(c[5].replace(/[^0-9]/g, '')) : 0;
+          
+          if (skuLimpio) {
+            productosCargados.push({
+              sku:    skuLimpio,
+              nombre: c[1] ? c[1].trim() : 'Producto sin nombre',
+              marca:  c[2] ? c[2].trim() : '',
+              cat:    c[3] ? c[3].trim() : '',
+              peso:   c[4] ? c[4].trim() : '',
+              precio: precioLimpio || 0,
+              e:      emoji(c[3] || '')
+            });
+          }
         }
       }
       
       if (productosCargados.length > 0) {
-        all = productosCargados; // Sobrescribimos el Plan B con los SKUs del Excel
+        all = productosCargados; 
       }
       
     } catch(e) {
@@ -1023,12 +1026,11 @@ async function init() {
 }
 
 function emoji(cat) {
-  // Quitamos plurales y espacios para que coincida aunque se escriba "Dulces" o "Licores"
   const limpia = cat.toLowerCase().replace(/s$/, '').trim();
   return {'miel':'🍯','caramelo':'🍬','licor':'🍶','aceite':'🫒','dulce':'🥛'}[limpia] || '🛍️';
 }
 
-// ── Render Optimizado por SKU ───────────────────────────────────────────
+// ── Render de Productos ───────────────────────────────────────────
 function render(list) {
   const g = document.getElementById('grid');
   if (!list || !list.length) {
@@ -1047,19 +1049,21 @@ function render(list) {
       </div>
       <div class="p-foot">
         <p class="p-price">$ ${p.precio.toLocaleString('es-AR')} <small>ARS</small></p>
-        <!-- Ahora el botón solo envía el código SKU único -->
         <button class="add" onclick="addPorSku('${p.sku}')">Agregar</button>
       </div>
     </div>`).join('');
 }
 
-// ── Lógica del Carrito por SKU ───────────────────────────────────────────
+// ── Lógica del Carrito ───────────────────────────────────────────
 function addPorSku(skuProducto) {
-  const btn = document.querySelector(`button[onclick="addPorSku('${skuProducto}')"]`);
+  // Buscamos el producto en la lista general usando el SKU
   const p = all.find(x => x.sku === skuProducto);
-  if (!p) return;
+  if (!p) {
+    console.log("No se encontró el producto con el SKU:", skuProducto);
+    return;
+  }
 
-  // Buscamos si el producto ya estaba en el carrito usando su SKU
+  // Buscamos si ya existe en el carrito
   const ex = cart.find(x => x.sku === skuProducto);
   
   if (ex) {
@@ -1068,7 +1072,8 @@ function addPorSku(skuProducto) {
     cart.push({ ...p, qty: 1 });
   }
 
-  // Animación visual del botón que hereda de Claude
+  // Animación del botón original de Claude
+  const btn = document.querySelector(`button[onclick="addPorSku('${skuProducto}')"]`);
   if (btn) {
     btn.textContent = '✓';
     btn.classList.add('done');
@@ -1081,14 +1086,12 @@ function addPorSku(skuProducto) {
   updateCart();
 }
 
-// Cambiar cantidad usando el SKU
 function chg(skuProducto, d) {
   const ex = cart.find(x => x.sku === skuProducto);
   if (!ex) return;
   
   ex.qty += d;
   
-  // Si la cantidad llega a 0, sacamos el producto del carrito usando su SKU
   if (ex.qty <= 0) {
     cart = cart.filter(x => x.sku !== skuProducto);
   }
@@ -1096,7 +1099,6 @@ function chg(skuProducto, d) {
   updateCart();
 }
 
-// Dibujo interno del carrito mapeado por SKU
 function updateCart() {
   const n = cart.reduce((s, x) => s + x.qty, 0);
   document.getElementById('count').textContent = n;
@@ -1120,7 +1122,7 @@ function updateCart() {
     : '<p class="empty">Todavía no agregaste nada.</p>';
 }
 
-// ── Filtros Corregidos ───────────────────────────────────────────
+// ── Filtros ───────────────────────────────────────────
 function fil(cat, btn) {
   document.querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
@@ -1140,7 +1142,7 @@ function fil(cat, btn) {
 function openCart()  { document.getElementById('overlay').classList.add('on'); document.getElementById('drawer').classList.add('on'); }
 function closeCart() { document.getElementById('overlay').classList.remove('on'); document.getElementById('drawer').classList.remove('on'); }
 
-// ── WhatsApp ─────────────────────────────────────────────────
+   // ── WhatsApp ─────────────────────────────────────────────────
 function wa() {
   return getComputedStyle(document.documentElement)
     .getPropertyValue('--wa-number').trim().replace(/['"]/g,'') || '5491100000000';
