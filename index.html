@@ -981,21 +981,41 @@ async function init() {
     try {
       const r = await fetch(csv);
       const t = await r.text();
-      all = parseCSV(t).map(c => ({
-        nombre: c[0], marca: c[1], cat: c[2], peso: c[3],
-        precio: parseInt(c[4]) || 0, e: emoji(c[2])
-      })).filter(p => p.nombre && p.precio > 0);
+      
+      // Separamos el texto por filas
+      const filas = t.split(/\r?\n/);
+      
+      const productosCargados = [];
+      
+      // Recorremos las filas saltándonos la primera (las cabeceras)
+      for (let i = 1; i < filas.length; i++) {
+        if (!filas[i].trim()) continue;
+        
+        // El truco clave: dividimos usando punto y coma (;) que usa Google Sheets en español
+        const c = filas[i].split(';');
+        
+        if (c.length >= 5) {
+          productosCargados.push({
+            nombre: c[0].trim(),
+            marca: c[1].trim(),
+            cat: c[2].trim(),
+            peso: c[3].trim(),
+            precio: parseInt(c[4].replace(/[^0-9]/g, '')) || 0,
+            e: emoji(c[2].trim())
+          });
+        }
+      }
+      
+      // Guardamos la lista si encontramos productos válidos
+      if (productosCargados.length > 0) {
+        all = productosCargados;
+      }
+      
     } catch(e) {
-      console.log("Error al leer el CSV, cargando Plan B");
+      console.log("Error al procesar el CSV, cargando Plan B:", e);
     }
-  } else {
-    console.log("No hay enlace de CSV, cargando Plan B");
   }
   render(all);
-}
-
-function emoji(cat) {
-  return {'Miel':'🍯','Caramelos':'🍬','Licor':'🍶','Aceite':'🫒','Dulce':'🥛'}[cat]||'🛍️';
 }
 
 // ── Render ───────────────────────────────────────────────────
