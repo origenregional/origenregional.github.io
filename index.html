@@ -988,7 +988,7 @@ async function init() {
       all = parseCSV(t).map(c => ({
         nombre: c[0], marca: c[1], cat: c[2], peso: c[3],
         precio: parseInt(c[4]) || 0, e: emoji(c[2])
-      })).filter(p => p.nombre && p.precio > 0);
+      }));
     } catch(e) {
       document.getElementById('notice').style.display='block';
     }
