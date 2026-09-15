@@ -973,7 +973,11 @@ const PRODUCTS = [
 let all = [...PRODUCTS];
 let cart = [];
 
-// ── Google Sheets CSV ────────────────────────────────────────
+// ============================================================================
+// ── SISTEMA INTEGRADO DE PRODUCTOS Y CARRITO (OPTIMIZADO POR SKU) ──
+// ============================================================================
+
+// ── Google Sheets CSV con Soporte SKU ────────────────────────
 async function init() {
   const csv = getComputedStyle(document.documentElement)
     .getPropertyValue('--sheet-csv').trim().replace(/['"]/g,'');
@@ -982,108 +986,155 @@ async function init() {
       const r = await fetch(csv);
       const t = await r.text();
       
-      // Separamos el texto por filas
+      // Separamos por líneas
       const filas = t.split(/\r?\n/);
-      
       const productosCargados = [];
       
-      // Recorremos las filas saltándonos la primera (las cabeceras)
+      // Empezamos en i = 1 para saltarnos la fila de títulos
       for (let i = 1; i < filas.length; i++) {
         if (!filas[i].trim()) continue;
         
-        // El truco clave: dividimos usando punto y coma (;) que usa Google Sheets en español
+        // Dividimos por punto y coma (;) tradicional de Google Sheets en español
         const c = filas[i].split(';');
         
-        if (c.length >= 5) {
+        // Verificamos que tenga al menos las 6 columnas (SKU, Nombre, Marca, Categoría, Peso, Precio)
+        if (c.length >= 6) {
           productosCargados.push({
-            nombre: c[0].trim(),
-            marca: c[1].trim(),
-            cat: c[2].trim(),
-            peso: c[3].trim(),
-            precio: parseInt(c[4].replace(/[^0-9]/g, '')) || 0,
-            e: emoji(c[2].trim())
+            sku:    c[0].trim(),
+            nombre: c[1].trim(),
+            marca:  c[2].trim(),
+            cat:    c[3].trim(),
+            peso:   c[4].trim(),
+            precio: parseInt(c[5].replace(/[^0-9]/g, '')) || 0,
+            e:      emoji(c[3].trim())
           });
         }
       }
       
-      // Guardamos la lista si encontramos productos válidos
       if (productosCargados.length > 0) {
-        all = productosCargados;
+        all = productosCargados; // Sobrescribimos el Plan B con los SKUs del Excel
       }
       
     } catch(e) {
-      console.log("Error al procesar el CSV, cargando Plan B:", e);
+      console.log("Error al procesar el CSV, manteniendo Plan B:", e);
     }
   }
   render(all);
 }
 
-// ── Render ───────────────────────────────────────────────────
+function emoji(cat) {
+  // Quitamos plurales y espacios para que coincida aunque se escriba "Dulces" o "Licores"
+  const limpia = cat.toLowerCase().replace(/s$/, '').trim();
+  return {'miel':'🍯','caramelo':'🍬','licor':'🍶','aceite':'🫒','dulce':'🥛'}[limpia] || '🛍️';
+}
+
+// ── Render Optimizado por SKU ───────────────────────────────────────────
 function render(list) {
   const g = document.getElementById('grid');
-  if (!list.length) {
-    g.innerHTML = '<p style="padding:3rem;color:var(--ink-2);font-style:italic;grid-column:1/-1">Sin resultados.</p>';
+  if (!list || !list.length) {
+    g.innerHTML = '<p style="padding:3rem;color:var(--ink-2);font-style:italic;grid-column:1/-1">Sin resultados en esta categoría...</p>';
     return;
   }
-  g.innerHTML = list.map((p,i) => `
-    <div class="p-card">
+  
+  g.innerHTML = list.map((p) => `
+    <div class="p-card" style="display: flex !important; visibility: visible !important;">
       <div class="p-img"><span>${p.e}</span></div>
       <div class="p-body">
         <p class="p-brand">${p.marca}</p>
         <p class="p-name">${p.nombre}</p>
         <p class="p-weight">${p.peso}</p>
+        <small style="color: var(--ink-2); font-size: 0.65rem; letter-spacing: 0.05em;">SKU: ${p.sku}</small>
       </div>
       <div class="p-foot">
         <p class="p-price">$ ${p.precio.toLocaleString('es-AR')} <small>ARS</small></p>
-        <button class="add" id="a${i}" onclick="add(${i},this)">Agregar</button>
+        <!-- Ahora el botón solo envía el código SKU único -->
+        <button class="add" onclick="addPorSku('${p.sku}')">Agregar</button>
       </div>
     </div>`).join('');
 }
 
-function fil(cat, btn) {
-  document.querySelectorAll('.filter').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  render(cat==='todos' ? all : all.filter(p=>p.cat===cat));
-}
+// ── Lógica del Carrito por SKU ───────────────────────────────────────────
+function addPorSku(skuProducto) {
+  const btn = document.querySelector(`button[onclick="addPorSku('${skuProducto}')"]`);
+  const p = all.find(x => x.sku === skuProducto);
+  if (!p) return;
 
-// ── Cart ─────────────────────────────────────────────────────
-function add(i, btn) {
-  const p = all[i];
-  const ex = cart.find(x=>x.i===i);
-  ex ? ex.qty++ : cart.push({i, ...p, qty:1});
-  btn.textContent = '✓';
-  btn.classList.add('done');
-  setTimeout(()=>{ btn.textContent='Agregar'; btn.classList.remove('done'); }, 1400);
+  // Buscamos si el producto ya estaba en el carrito usando su SKU
+  const ex = cart.find(x => x.sku === skuProducto);
+  
+  if (ex) {
+    ex.qty++;
+  } else {
+    cart.push({ ...p, qty: 1 });
+  }
+
+  // Animación visual del botón que hereda de Claude
+  if (btn) {
+    btn.textContent = '✓';
+    btn.classList.add('done');
+    setTimeout(() => { 
+      btn.textContent = 'Agregar'; 
+      btn.classList.remove('done'); 
+    }, 1400);
+  }
+
   updateCart();
 }
 
-function chg(i, d) {
-  const ex = cart.find(x=>x.i===i);
+// Cambiar cantidad usando el SKU
+function chg(skuProducto, d) {
+  const ex = cart.find(x => x.sku === skuProducto);
   if (!ex) return;
+  
   ex.qty += d;
-  if (ex.qty <= 0) cart = cart.filter(x=>x.i!==i);
+  
+  // Si la cantidad llega a 0, sacamos el producto del carrito usando su SKU
+  if (ex.qty <= 0) {
+    cart = cart.filter(x => x.sku !== skuProducto);
+  }
+  
   updateCart();
 }
 
+// Dibujo interno del carrito mapeado por SKU
 function updateCart() {
-  const n = cart.reduce((s,x)=>s+x.qty,0);
+  const n = cart.reduce((s, x) => s + x.qty, 0);
   document.getElementById('count').textContent = n;
-  const tot = cart.reduce((s,x)=>s+x.precio*x.qty,0);
-  document.getElementById('total').textContent = '$ '+tot.toLocaleString('es-AR');
+  
+  const tot = cart.reduce((s, x) => s + x.precio * x.qty, 0);
+  document.getElementById('total').textContent = '$ ' + tot.toLocaleString('es-AR');
+  
   const el = document.getElementById('items');
-  el.innerHTML = cart.length ? cart.map(x=>`
+  el.innerHTML = cart.length ? cart.map(x => `
     <div class="c-item">
       <div class="c-info">
         <p class="c-name">${x.nombre}</p>
-        <p class="c-sub">${x.peso} · $ ${(x.precio*x.qty).toLocaleString('es-AR')}</p>
+        <p class="c-sub">${x.peso} · $ ${(x.precio * x.qty).toLocaleString('es-AR')}</p>
       </div>
       <div class="c-controls">
-        <button class="q-btn" onclick="chg(${x.i},-1)">−</button>
+        <button class="q-btn" onclick="chg('${x.sku}', -1)">−</button>
         <span class="q-n">${x.qty}</span>
-        <button class="q-btn" onclick="chg(${x.i},+1)">+</button>
+        <button class="q-btn" onclick="chg('${x.sku}', +1)">+</button>
       </div>
     </div>`).join('')
     : '<p class="empty">Todavía no agregaste nada.</p>';
+}
+
+// ── Filtros Corregidos ───────────────────────────────────────────
+function fil(cat, btn) {
+  document.querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  
+  if (cat === 'todos') {
+    render(all);
+  } else {
+    const filtrados = all.filter(p => {
+      const catProducto = p.cat.toLowerCase().replace(/s$/, '').trim();
+      const catBuscada = cat.toLowerCase().replace(/s$/, '').trim();
+      return catProducto === catBuscada;
+    });
+    render(filtrados);
+  }
 }
 
 function openCart()  { document.getElementById('overlay').classList.add('on'); document.getElementById('drawer').classList.add('on'); }
