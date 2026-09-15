@@ -994,7 +994,7 @@ function parseCSV(text) {
   }
   return rows;
 }
- 
+
 // ── Google Sheets CSV ────────────────────────────────────────
 async function init() {
   const csv = getComputedStyle(document.documentElement)
@@ -1015,10 +1015,11 @@ async function init() {
   }
   render(all);
 }
- 
+
 function emoji(cat) {
   return {'Miel':'🍯','Caramelos':'🍬','Licor':'🍶','Aceite':'🫒','Dulce':'🥛'}[cat]||'🛍️';
 }
+
 // ── Render ───────────────────────────────────────────────────
 function render(list) {
   const g = document.getElementById('grid');
