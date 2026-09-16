@@ -420,17 +420,18 @@ nav {
 
 .add {
   font-family: 'Inter', sans-serif;
-  font-size: .72rem;
+  font-size: .75rem;
   font-weight: 400;
-  background: transparent;
-  color: var(--ink-2);
-  border: 1px solid var(--border-md);
-  border-radius: 2px;
-  padding: 6px 12px;
+  background: var(--card);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 20px;
+  padding: 7px 16px;
   cursor: pointer;
   transition: all .2s;
+  letter-spacing: .02em;
 }
-.add:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.add:hover { background: var(--ink); color: var(--bg); }
 .add.done { background: var(--olive); color: var(--bg); border-color: var(--olive); }
 
 /* config notice */
@@ -729,6 +730,73 @@ footer {
   .footer-meta { text-align: left; }
   .nav-links { display: none; }
 }
+
+
+/* ── TOAST ────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: .82rem;
+  padding: 10px 20px;
+  border-radius: 20px;
+  z-index: 300;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, transform .25s;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── MODAL DE PRODUCTO ────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(47,36,27,.55);
+  z-index: 400;
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.modal-overlay.on { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--card);
+  border-radius: 4px;
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  transform: scale(.96);
+  transition: transform .3s;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.modal-overlay.on .modal { transform: scale(1); }
+.modal-img {
+  background: var(--photo-bg);
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 5rem;
+  overflow: hidden;
+}
+.modal-img img { width: 100%; height: 100%; object-fit: cover; }
+.modal-body { padding: 2rem; display: flex; flex-direction: column; }
+.modal-close { background: none; border: none; color: var(--ink-2); font-size: 1.4rem; cursor: pointer; align-self: flex-end; margin-bottom: .5rem; transition: color .2s; line-height: 1; padding: 4px; }
+.modal-close:hover { color: var(--ink); }
+.modal-brand { font-size: .7rem; color: var(--gold); letter-spacing: .1em; margin-bottom: .4rem; }
+.modal-name { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--ink); margin-bottom: .3rem; line-height: 1.2; }
+.modal-weight { font-size: .8rem; color: var(--ink-2); margin-bottom: 1rem; }
+.modal-desc { font-size: .85rem; color: var(--ink-2); line-height: 1.75; flex: 1; margin-bottom: 1.25rem; }
+.modal-price { font-size: 1.3rem; color: var(--ink); font-weight: 400; margin-bottom: 1rem; }
+.modal-price small { font-size: .7rem; color: var(--ink-2); font-weight: 300; }
+@media (max-width: 580px) { .modal { grid-template-columns: 1fr; } .modal-img { min-height: 200px; } }
 
 </style>
 </head>
@@ -1064,25 +1132,26 @@ function render(list) {
     g.innerHTML = '<p style="padding:3rem;color:var(--ink-2);font-style:italic;grid-column:1/-1">Sin resultados en esta categoría...</p>';
     return;
   }
-  // Si el Excel tiene un enlace de imagen válido, muestra la foto. Si está vacío, usa el emoji de respaldo ─────────────────────────────────────────── 
-  g.innerHTML = list.map((p) => `
-    <div class="p-card" style="display: flex !important; visibility: visible !important;">
-      <div class="p-img">
-        ${p.imagen && p.imagen.startsWith('http') 
-          ? `<img src="${p.imagen}" alt="${p.nombre}" style="width:100%; height:100%; object-fit:cover;">` 
-          : `<span>${p.e}</span>`
-        }
+  g.innerHTML = list.map((p) => {
+    const imgHtml = p.imagen && p.imagen.startsWith('http')
+      ? `<img src="${p.imagen}" alt="${p.nombre}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`
+      : `<span>${p.e}</span>`;
+    return `
+    <div class="p-card">
+      <div class="p-img" onclick="openModal('${p.sku}')" style="cursor:zoom-in;">
+        ${imgHtml}
       </div>
-      <div class="p-body">
+      <div class="p-body" onclick="openModal('${p.sku}')" style="cursor:pointer;">
         <p class="p-brand">${p.marca}</p>
         <p class="p-name">${p.nombre}</p>
         <p class="p-weight">${p.peso}</p>
       </div>
       <div class="p-foot">
         <p class="p-price">$ ${p.precio.toLocaleString('es-AR')} <small>ARS</small></p>
-        <button class="add" onclick="addPorSku('${p.sku}')">Agregar</button>
+        <button class="add" id="add-${p.sku}" onclick="addPorSku('${p.sku}')">Agregar</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── Lógica del Carrito ───────────────────────────────────────────
@@ -1100,17 +1169,32 @@ function addPorSku(skuProducto) {
     cart.push({ ...p, qty: 1 });
   }
 
-  const btn = document.querySelector(`button[onclick="addPorSku('${skuProducto}')"]`);
+  // Feedback botón card
+  const btn = document.getElementById('add-' + skuProducto);
   if (btn) {
     btn.textContent = '✓';
     btn.classList.add('done');
-    setTimeout(() => { 
-      btn.textContent = 'Agregar'; 
-      btn.classList.remove('done'); 
-    }, 1400);
+    setTimeout(() => { btn.textContent = 'Agregar'; btn.classList.remove('done'); }, 1400);
   }
-
+  // Feedback botón modal (si está abierto)
+  const mbtn = document.getElementById('modal-add-btn');
+  if (mbtn && mbtn.dataset.sku === skuProducto) {
+    mbtn.textContent = '✓ Agregado';
+    mbtn.classList.add('done');
+    setTimeout(() => { mbtn.textContent = 'Agregar al pedido'; mbtn.classList.remove('done'); }, 1400);
+  }
+  // Toast
+  showToast(p.nombre);
   updateCart();
+}
+
+let _toastTimer;
+function showToast(name) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = name + ' agregado';
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
 function chg(skuProducto, d) {
@@ -1189,7 +1273,56 @@ function supplierWA(btn) {
   window.open(`https://wa.me/${wa()}?text=${encodeURIComponent(msg)}`,'_blank');
 }
 
+
+// ── Modal ────────────────────────────────────────────────────
+let _modalSku = null;
+function openModal(sku) {
+  const p = all.find(x => x.sku === sku);
+  if (!p) return;
+  _modalSku = sku;
+  const imgEl = document.getElementById('modal-img');
+  imgEl.innerHTML = p.imagen && p.imagen.startsWith('http')
+    ? `<img src="${p.imagen}" alt="${p.nombre}" style="width:100%;height:100%;object-fit:cover;">`
+    : `<span style="font-size:5rem">${p.e}</span>`;
+  document.getElementById('modal-brand').textContent = p.marca;
+  document.getElementById('modal-name').textContent = p.nombre;
+  document.getElementById('modal-weight').textContent = p.peso;
+  document.getElementById('modal-desc').textContent = p.desc || '';
+  document.getElementById('modal-price').innerHTML = `$ ${p.precio.toLocaleString('es-AR')} <small>ARS</small>`;
+  const mb = document.getElementById('modal-add-btn');
+  mb.dataset.sku = sku;
+  mb.textContent = 'Agregar al pedido';
+  mb.classList.remove('done');
+  document.getElementById('modal-overlay').classList.add('on');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(e) { if (e.target.id === 'modal-overlay') closeModalDirect(); }
+function closeModalDirect() {
+  document.getElementById('modal-overlay').classList.remove('on');
+  document.body.style.overflow = '';
+}
+function modalAdd() { if (_modalSku) addPorSku(_modalSku); }
+
 init();
 </script>
+
+<!-- TOAST -->
+<div class="toast" id="toast">✓ <span id="toast-msg"></span></div>
+
+<!-- MODAL PRODUCTO -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-img" id="modal-img"></div>
+    <div class="modal-body">
+      <button class="modal-close" onclick="closeModalDirect()">×</button>
+      <p class="modal-brand" id="modal-brand"></p>
+      <h3 class="modal-name" id="modal-name"></h3>
+      <p class="modal-weight" id="modal-weight"></p>
+      <p class="modal-desc" id="modal-desc"></p>
+      <p class="modal-price" id="modal-price"></p>
+      <button class="add modal-add" id="modal-add-btn" onclick="modalAdd()">Agregar al pedido</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
