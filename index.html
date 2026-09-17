@@ -1100,8 +1100,7 @@ async function init() {
               cat:    catRaw ? catRaw.trim() : '',
               peso:   pesoRaw ? pesoRaw.trim() : '',
               precio: precioFinal || 0,
-              imagen: imagenRaw ? imagenRaw.trim() : '', // ← ¡Aquí se guarda la foto!
-              
+              imagen: imagenRaw ? imagenRaw.trim() : '',
               e:      emoji(catRaw || '')
             });
           }
@@ -1287,7 +1286,15 @@ function openModal(sku) {
   document.getElementById('modal-brand').textContent = p.marca;
   document.getElementById('modal-name').textContent = p.nombre;
   document.getElementById('modal-weight').textContent = p.peso;
-  document.getElementById('modal-desc').textContent = p.desc || '';
+  const desc = getDesc(p.sku);
+  const descEl = document.getElementById('modal-desc');
+  if (desc) {
+    descEl.innerHTML = desc;
+    descEl.style.display = '';
+  } else {
+    descEl.innerHTML = '';
+    descEl.style.display = 'none';
+  }
   document.getElementById('modal-price').innerHTML = `$ ${p.precio.toLocaleString('es-AR')} <small>ARS</small>`;
   const mb = document.getElementById('modal-add-btn');
   mb.dataset.sku = sku;
@@ -1302,6 +1309,23 @@ function closeModalDirect() {
   document.body.style.overflow = '';
 }
 function modalAdd() { if (_modalSku) addPorSku(_modalSku); }
+
+
+// ═══════════════════════════════════════════════════════════
+//  DESCRIPCIONES POR PRODUCTO
+//  Editá el texto acá. Podés usar HTML básico:
+//  <br> para salto de línea, <strong> para negrita, <em> para cursiva.
+//  La clave es el SKU del producto (columna A de tu Google Sheet).
+// ═══════════════════════════════════════════════════════════
+const DESCRIPCIONES = {
+  // Ejemplo:
+  // 'MON-LICORARANDANO': 'Licor artesanal elaborado por los Monjes Benedictinos.<br><strong>Contenido:</strong> 750 ml · <strong>Graduación:</strong> 20% vol.',
+
+};
+
+function getDesc(sku) {
+  return DESCRIPCIONES[sku] || '';
+}
 
 init();
 </script>
